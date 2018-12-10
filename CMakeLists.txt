@@ -1,3 +1,6 @@
-project(Adam)
-aux_source_directory(. DIR_TOOT_SRCS)
-add_executable(Adam ${DIR_TOOT_SRCS})
+cmake_minimum_required(VERSION 3.9)
+project(untitled C)
+
+set(CMAKE_C_STANDARD 99)
+
+add_executable(untitled main.c)

